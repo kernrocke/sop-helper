@@ -24,7 +24,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <BrowserRouter>
+      <BrowserRouter basename="/sop-helper">
         <div className="flex flex-col min-h-screen">
           <SiteHeader />
           <div className="flex-1">
