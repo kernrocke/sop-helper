@@ -1,5 +1,8 @@
-// SOP search engine — sentence-level retrieval for concise, relevant answers
+// SOP search engine — hybrid: curated Q&A + full-text search fallback
 
+import { curatedQA } from "./curatedQA";
+
+// === Full-text search engine (fallback) ===
 let sentences: { text: string; section: string }[] = [];
 let loaded = false;
 let loadingPromise: Promise<void> | null = null;
@@ -7,73 +10,53 @@ let loadingPromise: Promise<void> | null = null;
 function extractSentences(text: string): { text: string; section: string }[] {
   const results: { text: string; section: string }[] = [];
   let currentSection = "General";
-
   const lines = text.split("\n");
   let buffer = "";
 
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
+    if (/^\+[-=+]+\+$/.test(trimmed) || /^\|?\s*[-=]+\s*\|?$/.test(trimmed)) continue;
 
-    // Detect section headings
     const headingMatch = trimmed.match(/^(\d+\.?\d*\.?\s+.{5,80})$/);
     if (headingMatch || /^[A-Z][A-Za-z\s,&-]{4,60}:?\s*$/.test(trimmed)) {
-      if (buffer.length > 20) {
-        pushSentences(buffer, currentSection, results);
-      }
+      if (buffer.length > 20) pushSentences(buffer, currentSection, results);
       buffer = "";
       currentSection = trimmed.replace(/^\d+\.?\d*\.?\s*/, "").replace(/:$/, "").trim() || currentSection;
       continue;
     }
 
-    // Skip table formatting lines
-    if (/^\+[-=+]+\+$/.test(trimmed) || /^\|?\s*[-=]+\s*\|?$/.test(trimmed)) continue;
-
     buffer += " " + trimmed.replace(/\|/g, " ").replace(/\[.*?\]/g, "");
   }
   if (buffer.length > 20) pushSentences(buffer, currentSection, results);
-
   return results;
 }
 
 function pushSentences(text: string, section: string, results: { text: string; section: string }[]) {
-  // Split into sentences
-  const parts = text
-    .replace(/\s+/g, " ")
-    .split(/(?<=[.!?])\s+(?=[A-Z])|(?<=\n)\s*(?=[a-z])/g)
-    .map(s => s.trim())
-    .filter(s => s.length > 15);
-
-  // Group into chunks of 1-3 sentences for context
+  const parts = text.replace(/\s+/g, " ").split(/(?<=[.!?])\s+(?=[A-Z])/).map(s => s.trim()).filter(s => s.length > 15);
   for (let i = 0; i < parts.length; i++) {
     const chunk = parts.slice(i, i + 2).join(" ");
-    if (chunk.length > 15) {
-      results.push({ text: chunk, section });
-    }
+    if (chunk.length > 15) results.push({ text: chunk, section });
   }
 }
 
 export async function loadSOP(): Promise<void> {
   if (loaded) return;
   if (loadingPromise) return loadingPromise;
-
   loadingPromise = fetch("/sop_knowledge.txt")
     .then(r => r.text())
-    .then(text => {
-      sentences = extractSentences(text);
-      loaded = true;
-    });
+    .then(text => { sentences = extractSentences(text); loaded = true; });
   return loadingPromise;
 }
 
+// === Matching utilities ===
 const STOP_WORDS = new Set([
-  "the", "and", "for", "are", "but", "not", "you", "all", "can", "has", "her",
-  "was", "one", "our", "out", "his", "had", "she", "how", "its", "may", "who",
-  "did", "get", "let", "say", "too", "use", "way", "many", "then", "them",
-  "been", "have", "with", "this", "that", "from", "they", "will", "would",
-  "there", "their", "what", "about", "which", "when", "make", "like", "each",
-  "does", "into", "than", "could", "other", "more", "some", "very", "after",
-  "also", "should", "these", "those", "being", "such", "only", "over", "shall",
+  "the","and","for","are","but","not","you","all","can","has","her","was","one",
+  "our","out","his","had","she","how","its","may","who","did","get","let","say",
+  "too","use","way","many","then","them","been","have","with","this","that","from",
+  "they","will","would","there","their","what","about","which","when","make","like",
+  "each","does","into","than","could","other","more","some","very","after","also",
+  "should","these","those","being","such","only","over","shall","tell","please",
 ]);
 
 function tokenize(text: string): string[] {
@@ -84,107 +67,118 @@ function getQueryTerms(query: string): string[] {
   return tokenize(query).filter(w => !STOP_WORDS.has(w));
 }
 
-// Stem-like matching: check if words share a common root (simple prefix match)
 function wordMatch(a: string, b: string): boolean {
   if (a === b) return true;
   const minLen = Math.min(a.length, b.length);
   if (minLen < 4) return a === b;
-  // Share at least 80% prefix
-  const prefixLen = Math.min(minLen, Math.max(4, Math.floor(minLen * 0.8)));
+  const prefixLen = Math.min(minLen, Math.max(4, Math.floor(minLen * 0.75)));
   return a.substring(0, prefixLen) === b.substring(0, prefixLen);
 }
 
-function scoreSentence(item: { text: string; section: string }, queryTerms: string[]): number {
-  const textLower = item.text.toLowerCase();
-  const tokens = tokenize(item.text);
-  const sectionLower = item.section.toLowerCase();
-  let score = 0;
+// === Curated Q&A matching ===
+function matchCuratedQA(query: string): string | null {
+  const normalized = query.toLowerCase().replace(/[?.,!'"]/g, "").trim();
+  const queryTerms = getQueryTerms(query);
 
-  const matched = new Set<string>();
+  let bestScore = 0;
+  let bestAnswer: string | null = null;
 
-  for (const term of queryTerms) {
-    // Check section relevance
-    if (sectionLower.includes(term)) score += 5;
+  for (const entry of curatedQA) {
+    let score = 0;
 
-    // Token matching with stemming
-    for (const tok of tokens) {
-      if (wordMatch(tok, term)) {
-        score += 3;
-        matched.add(term);
-        break;
+    // Check intent phrase matching
+    for (const intent of entry.intents) {
+      const intentNorm = intent.toLowerCase();
+      
+      // Exact phrase match — highest score
+      if (normalized.includes(intentNorm)) {
+        score += intentNorm.split(" ").length * 10;
+      } else {
+        // Partial word matching
+        const intentWords = tokenize(intentNorm).filter(w => !STOP_WORDS.has(w));
+        let matched = 0;
+        for (const iw of intentWords) {
+          if (queryTerms.some(qt => wordMatch(qt, iw))) matched++;
+        }
+        if (intentWords.length > 0) {
+          const ratio = matched / intentWords.length;
+          if (ratio >= 0.6) score += matched * 4;
+        }
       }
     }
 
-    // Substring presence
-    if (textLower.includes(term)) {
-      score += 2;
-      matched.add(term);
+    if (score > bestScore) {
+      bestScore = score;
+      bestAnswer = entry.answer;
     }
   }
 
-  // Coverage bonus: reward matching more query terms
-  const coverage = matched.size / queryTerms.length;
-  score *= (0.5 + coverage);
-
-  // Prefer shorter, focused sentences
-  if (item.text.length < 200) score *= 1.2;
-  if (item.text.length > 500) score *= 0.7;
-
-  return score;
+  // Require a minimum confidence threshold
+  return bestScore >= 6 ? bestAnswer : null;
 }
 
-// Deduplicate similar sentences
-function deduplicate(items: { text: string; section: string; score: number }[]): typeof items {
-  const result: typeof items = [];
-  for (const item of items) {
-    const isDuplicate = result.some(r => {
-      const overlap = item.text.substring(0, 60);
-      return r.text.includes(overlap) || overlap.length > 20 && r.text.substring(0, 60) === overlap;
-    });
-    if (!isDuplicate) result.push(item);
+// === Full-text search fallback ===
+function searchFullText(queryTerms: string[]): string | null {
+  if (!loaded || sentences.length === 0) return null;
+
+  const scored = sentences
+    .map(s => {
+      const textLower = s.text.toLowerCase();
+      const tokens = tokenize(s.text);
+      const sectionLower = s.section.toLowerCase();
+      let score = 0;
+      const matched = new Set<string>();
+
+      for (const term of queryTerms) {
+        if (sectionLower.includes(term)) score += 5;
+        for (const tok of tokens) {
+          if (wordMatch(tok, term)) { score += 3; matched.add(term); break; }
+        }
+        if (textLower.includes(term)) { score += 2; matched.add(term); }
+      }
+
+      const coverage = matched.size / queryTerms.length;
+      score *= (0.5 + coverage);
+      if (s.text.length < 200) score *= 1.2;
+      if (s.text.length > 500) score *= 0.7;
+
+      return { ...s, score };
+    })
+    .filter(s => s.score > 5)
+    .sort((a, b) => b.score - a.score);
+
+  // Deduplicate
+  const unique: typeof scored = [];
+  for (const item of scored) {
+    if (!unique.some(r => r.text.substring(0, 60) === item.text.substring(0, 60))) {
+      unique.push(item);
+    }
+    if (unique.length >= 3) break;
   }
-  return result;
+
+  if (unique.length === 0) return null;
+
+  const bullets = unique
+    .map(r => `• ${r.text.replace(/\s+/g, " ").trim()}`)
+    .join("\n\n");
+
+  return `Based on the ESAVI SOPs:\n\n${bullets}\n\n*(For more detailed information, please refer to the specific SOP section.)*`;
 }
 
+// === Main search function ===
 export function searchSOP(query: string): string {
-  if (!loaded || sentences.length === 0) {
-    return "I'm still loading the SOP documents. Please try again in a moment.";
-  }
+  // 1. Try curated Q&A first
+  const curatedAnswer = matchCuratedQA(query);
+  if (curatedAnswer) return curatedAnswer;
 
+  // 2. Fall back to full-text search
   const queryTerms = getQueryTerms(query);
   if (queryTerms.length === 0) {
     return "Could you please rephrase your question? Try asking about specific ESAVI topics like detection, reporting, investigation, causality, or case management.";
   }
 
-  // Score all sentences
-  const scored = sentences
-    .map(s => ({ ...s, score: scoreSentence(s, queryTerms) }))
-    .filter(s => s.score > 3)
-    .sort((a, b) => b.score - a.score);
+  const textResult = searchFullText(queryTerms);
+  if (textResult) return textResult;
 
-  const unique = deduplicate(scored);
-
-  if (unique.length === 0) {
-    return `I couldn't find specific information about that in the ESAVI SOPs.\n\nTry asking about:\n• What is an ESAVI?\n• How to detect and report ESAVIs\n• Investigation procedures\n• Causality assessment process\n• Case management phases`;
-  }
-
-  // Take top 3-5 most relevant sentences and group by section
-  const top = unique.slice(0, 5);
-  const sections = new Map<string, string[]>();
-
-  for (const item of top) {
-    const sec = item.section || "General";
-    if (!sections.has(sec)) sections.set(sec, []);
-    sections.get(sec)!.push(item.text.replace(/\s+/g, " ").trim());
-  }
-
-  let response = "**Based on the ESAVI SOPs:**\n\n";
-  for (const [section, texts] of sections) {
-    if (sections.size > 1) response += `**${section}:**\n`;
-    for (const t of texts) {
-      response += `• ${t}\n\n`;
-    }
-  }
-
-  return response.trim();
+  return `I couldn't find specific information about that in the ESAVI SOPs.\n\nTry asking about:\n• What is an ESAVI?\n• Who is responsible for ESAVI detection?\n• How do I report an ESAVI?\n• What are the reporting deadlines?\n• What is causality assessment?\n• What are the investigation criteria?`;
 }
