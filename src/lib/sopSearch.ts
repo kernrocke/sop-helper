@@ -1,57 +1,71 @@
-// SOP full-text search engine
-// Loads sop_knowledge.txt, splits into passages, and ranks by relevance
+// SOP search engine — sentence-level retrieval for concise, relevant answers
 
-let passages: string[] = [];
+let sentences: { text: string; section: string }[] = [];
 let loaded = false;
 let loadingPromise: Promise<void> | null = null;
 
-function splitIntoPassages(text: string): string[] {
-  // Split by numbered sections, headings, or double newlines
-  const raw = text.split(/\n{2,}/);
-  const result: string[] = [];
+function extractSentences(text: string): { text: string; section: string }[] {
+  const results: { text: string; section: string }[] = [];
+  let currentSection = "General";
+
+  const lines = text.split("\n");
   let buffer = "";
 
-  for (const chunk of raw) {
-    const trimmed = chunk.trim();
+  for (const line of lines) {
+    const trimmed = line.trim();
     if (!trimmed) continue;
-    
-    // If it looks like a heading/section start, flush buffer and start new
-    if (/^\d+\.?\s+[A-Z]/.test(trimmed) || /^[A-Z][A-Za-z\s]+:?\s*$/.test(trimmed.split("\n")[0])) {
-      if (buffer.length > 100) result.push(buffer.trim());
-      buffer = trimmed;
-    } else {
-      buffer += "\n\n" + trimmed;
-    }
-    
-    // Keep passages manageable size (split if too long)
-    if (buffer.length > 1500) {
-      result.push(buffer.trim());
+
+    // Detect section headings
+    const headingMatch = trimmed.match(/^(\d+\.?\d*\.?\s+.{5,80})$/);
+    if (headingMatch || /^[A-Z][A-Za-z\s,&-]{4,60}:?\s*$/.test(trimmed)) {
+      if (buffer.length > 20) {
+        pushSentences(buffer, currentSection, results);
+      }
       buffer = "";
+      currentSection = trimmed.replace(/^\d+\.?\d*\.?\s*/, "").replace(/:$/, "").trim() || currentSection;
+      continue;
+    }
+
+    // Skip table formatting lines
+    if (/^\+[-=+]+\+$/.test(trimmed) || /^\|?\s*[-=]+\s*\|?$/.test(trimmed)) continue;
+
+    buffer += " " + trimmed.replace(/\|/g, " ").replace(/\[.*?\]/g, "");
+  }
+  if (buffer.length > 20) pushSentences(buffer, currentSection, results);
+
+  return results;
+}
+
+function pushSentences(text: string, section: string, results: { text: string; section: string }[]) {
+  // Split into sentences
+  const parts = text
+    .replace(/\s+/g, " ")
+    .split(/(?<=[.!?])\s+(?=[A-Z])|(?<=\n)\s*(?=[a-z])/g)
+    .map(s => s.trim())
+    .filter(s => s.length > 15);
+
+  // Group into chunks of 1-3 sentences for context
+  for (let i = 0; i < parts.length; i++) {
+    const chunk = parts.slice(i, i + 2).join(" ");
+    if (chunk.length > 15) {
+      results.push({ text: chunk, section });
     }
   }
-  if (buffer.length > 50) result.push(buffer.trim());
-  return result;
 }
 
 export async function loadSOP(): Promise<void> {
   if (loaded) return;
   if (loadingPromise) return loadingPromise;
-  
+
   loadingPromise = fetch("/sop_knowledge.txt")
     .then(r => r.text())
     .then(text => {
-      passages = splitIntoPassages(text);
+      sentences = extractSentences(text);
       loaded = true;
     });
   return loadingPromise;
 }
 
-// Tokenize text into words
-function tokenize(text: string): string[] {
-  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2);
-}
-
-// Stop words to ignore
 const STOP_WORDS = new Set([
   "the", "and", "for", "are", "but", "not", "you", "all", "can", "has", "her",
   "was", "one", "our", "out", "his", "had", "she", "how", "its", "may", "who",
@@ -62,51 +76,78 @@ const STOP_WORDS = new Set([
   "also", "should", "these", "those", "being", "such", "only", "over", "shall",
 ]);
 
+function tokenize(text: string): string[] {
+  return text.toLowerCase().replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(w => w.length > 2);
+}
+
 function getQueryTerms(query: string): string[] {
   return tokenize(query).filter(w => !STOP_WORDS.has(w));
 }
 
-// Score a passage against query terms using term frequency
-function scorePassage(passage: string, queryTerms: string[]): number {
-  const passageLower = passage.toLowerCase();
-  const passageTokens = tokenize(passage);
+// Stem-like matching: check if words share a common root (simple prefix match)
+function wordMatch(a: string, b: string): boolean {
+  if (a === b) return true;
+  const minLen = Math.min(a.length, b.length);
+  if (minLen < 4) return a === b;
+  // Share at least 80% prefix
+  const prefixLen = Math.min(minLen, Math.max(4, Math.floor(minLen * 0.8)));
+  return a.substring(0, prefixLen) === b.substring(0, prefixLen);
+}
+
+function scoreSentence(item: { text: string; section: string }, queryTerms: string[]): number {
+  const textLower = item.text.toLowerCase();
+  const tokens = tokenize(item.text);
+  const sectionLower = item.section.toLowerCase();
   let score = 0;
 
-  for (const term of queryTerms) {
-    // Exact word match count
-    const count = passageTokens.filter(t => t === term || t.startsWith(term) || term.startsWith(t)).length;
-    score += count * 2;
+  const matched = new Set<string>();
 
-    // Phrase proximity bonus - if query terms appear near each other
-    if (passageLower.includes(term)) {
-      score += 3;
+  for (const term of queryTerms) {
+    // Check section relevance
+    if (sectionLower.includes(term)) score += 5;
+
+    // Token matching with stemming
+    for (const tok of tokens) {
+      if (wordMatch(tok, term)) {
+        score += 3;
+        matched.add(term);
+        break;
+      }
+    }
+
+    // Substring presence
+    if (textLower.includes(term)) {
+      score += 2;
+      matched.add(term);
     }
   }
 
-  // Bonus for multiple query terms appearing together
-  const matchedTerms = queryTerms.filter(t => passageLower.includes(t));
-  if (matchedTerms.length > 1) {
-    score += matchedTerms.length * 5;
-  }
+  // Coverage bonus: reward matching more query terms
+  const coverage = matched.size / queryTerms.length;
+  score *= (0.5 + coverage);
 
-  // Penalize very long passages slightly (prefer focused content)
-  if (passage.length > 1000) score *= 0.9;
+  // Prefer shorter, focused sentences
+  if (item.text.length < 200) score *= 1.2;
+  if (item.text.length > 500) score *= 0.7;
 
   return score;
 }
 
-// Format passage for display - clean up markdown artifacts
-function formatPassage(passage: string): string {
-  return passage
-    .replace(/\+[-=]+\+/g, "") // remove table borders
-    .replace(/\|/g, "") // remove table pipes
-    .replace(/\[.*?\]/g, "") // remove bracket references
-    .replace(/\n{3,}/g, "\n\n") // collapse multiple newlines
-    .trim();
+// Deduplicate similar sentences
+function deduplicate(items: { text: string; section: string; score: number }[]): typeof items {
+  const result: typeof items = [];
+  for (const item of items) {
+    const isDuplicate = result.some(r => {
+      const overlap = item.text.substring(0, 60);
+      return r.text.includes(overlap) || overlap.length > 20 && r.text.substring(0, 60) === overlap;
+    });
+    if (!isDuplicate) result.push(item);
+  }
+  return result;
 }
 
 export function searchSOP(query: string): string {
-  if (!loaded || passages.length === 0) {
+  if (!loaded || sentences.length === 0) {
     return "I'm still loading the SOP documents. Please try again in a moment.";
   }
 
@@ -115,27 +156,35 @@ export function searchSOP(query: string): string {
     return "Could you please rephrase your question? Try asking about specific ESAVI topics like detection, reporting, investigation, causality, or case management.";
   }
 
-  // Score all passages
-  const scored = passages
-    .map((p, i) => ({ passage: p, index: i, score: scorePassage(p, queryTerms) }))
-    .filter(s => s.score > 0)
+  // Score all sentences
+  const scored = sentences
+    .map(s => ({ ...s, score: scoreSentence(s, queryTerms) }))
+    .filter(s => s.score > 3)
     .sort((a, b) => b.score - a.score);
 
-  if (scored.length === 0) {
-    return `I couldn't find information about "${query}" in the ESAVI Standard Operating Procedures.\n\nTry asking about:\n• ESAVI detection and notification\n• Reporting procedures and deadlines\n• Investigation process\n• Causality assessment\n• Case management\n• Data management and analysis`;
+  const unique = deduplicate(scored);
+
+  if (unique.length === 0) {
+    return `I couldn't find specific information about that in the ESAVI SOPs.\n\nTry asking about:\n• What is an ESAVI?\n• How to detect and report ESAVIs\n• Investigation procedures\n• Causality assessment process\n• Case management phases`;
   }
 
-  // Take top 1-3 passages depending on scores
-  const topResults = scored.slice(0, Math.min(3, scored.length));
-  
-  // If the top result is significantly better, just use it
-  if (topResults.length > 1 && topResults[0].score > topResults[1].score * 2) {
-    return `Based on the ESAVI SOPs:\n\n${formatPassage(topResults[0].passage)}`;
+  // Take top 3-5 most relevant sentences and group by section
+  const top = unique.slice(0, 5);
+  const sections = new Map<string, string[]>();
+
+  for (const item of top) {
+    const sec = item.section || "General";
+    if (!sections.has(sec)) sections.set(sec, []);
+    sections.get(sec)!.push(item.text.replace(/\s+/g, " ").trim());
   }
 
-  const combined = topResults
-    .map(r => formatPassage(r.passage))
-    .join("\n\n---\n\n");
+  let response = "**Based on the ESAVI SOPs:**\n\n";
+  for (const [section, texts] of sections) {
+    if (sections.size > 1) response += `**${section}:**\n`;
+    for (const t of texts) {
+      response += `• ${t}\n\n`;
+    }
+  }
 
-  return `Based on the ESAVI SOPs:\n\n${combined}`;
+  return response.trim();
 }
