@@ -1,5 +1,7 @@
 import SOPLayout from "@/components/SOPLayout";
 
+const base = import.meta.env.BASE_URL;
+
 const sidebarItems = [
   { id: "introduction", label: "1. Introduction" },
   { id: "purpose", label: "2. Purpose" },
@@ -15,7 +17,7 @@ const sidebarItems = [
 
 const Causality = () => (
   <SOPLayout title="ESAVI Causality Assessment & Final Classification" version="1.0" updateDate="04/04/2025"
-    headerImage="/images/causality.png" sidebarItems={sidebarItems}
+    headerImage={`${base}images/causality.png`} sidebarItems={sidebarItems}
     backLink={{ to: "/sop-overview", label: "SOP Overview" }}>
 
     <section id="introduction" className="sop-section">
@@ -68,7 +70,7 @@ const Causality = () => (
         <li>Cases with significant public health implications</li>
         <li>Cases generating public concern</li>
       </ul>
-      <img src="/images/causality1.png" alt="Create question on causality" className="w-full rounded-lg border border-border mt-4" />
+      <img src={`${base}images/causality1.png`} alt="Create question on causality" className="w-full rounded-lg border border-border mt-4" />
     </section>
 
     <section id="assessment-steps" className="sop-section">
@@ -94,15 +96,15 @@ const Causality = () => (
         </div>
       </div>
 
-      <img src="/images/causality2.png" alt="Causality assessment checklist part 1" className="w-full rounded-lg border border-border mt-4" />
-      <img src="/images/causality_2_2.png" alt="Causality assessment checklist part 2" className="w-full rounded-lg border border-border mt-4" />
-      <img src="/images/causality3.png" alt="Causality assessment algorithm" className="w-full rounded-lg border border-border mt-4" />
+      <img src={`${base}images/causality2.png`} alt="Causality assessment checklist part 1" className="w-full rounded-lg border border-border mt-4" />
+      <img src={`${base}images/causality_2_2.png`} alt="Causality assessment checklist part 2" className="w-full rounded-lg border border-border mt-4" />
+      <img src={`${base}images/causality3.png`} alt="Causality assessment algorithm" className="w-full rounded-lg border border-border mt-4" />
       <p className="text-xs text-muted-foreground mt-2 italic">Figure: WHO Causality Assessment Algorithm</p>
     </section>
 
     <section id="report-structure" className="sop-section">
       <h2 className="text-xl font-heading font-bold text-secondary mb-3">9. Final Classification</h2>
-      <img src="/images/causality4.png" alt="Final classification categories" className="w-full rounded-lg border border-border mb-4" />
+      <img src={`${base}images/causality4.png`} alt="Final classification categories" className="w-full rounded-lg border border-border mb-4" />
       <div className="space-y-3">
         <div className="p-3 rounded-lg border-l-4 border-accent">
           <h4 className="font-semibold text-foreground text-sm">A. Consistent with causal association</h4>
@@ -146,7 +148,7 @@ const Causality = () => (
           </tbody>
         </table>
       </div>
-      <img src="/images/TTO_ESAVI_causality.png" alt="T&T ESAVI Surveillance System Flow Diagram for Causality" className="w-full rounded-lg border border-border mt-4" />
+      <img src={`${base}images/TTO_ESAVI_causality.png`} alt="T&T ESAVI Surveillance System Flow Diagram for Causality" className="w-full rounded-lg border border-border mt-4" />
     </section>
   </SOPLayout>
 );

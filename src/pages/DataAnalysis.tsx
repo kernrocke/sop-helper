@@ -1,5 +1,7 @@
 import SOPLayout from "@/components/SOPLayout";
 
+const base = import.meta.env.BASE_URL;
+
 const sidebarItems = [
   { id: "introduction", label: "1. Introduction" },
   { id: "purpose", label: "2. Purpose" },
@@ -13,7 +15,7 @@ const sidebarItems = [
 
 const DataAnalysis = () => (
   <SOPLayout title="ESAVI Data Management & Analysis" version="1.0" updateDate="25/06/2025"
-    headerImage="/images/data_analysis.png" sidebarItems={sidebarItems}
+    headerImage={`${base}images/data_analysis.png`} sidebarItems={sidebarItems}
     backLink={{ to: "/sop-overview", label: "SOP Overview" }}>
 
     <section id="introduction" className="sop-section">

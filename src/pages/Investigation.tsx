@@ -1,5 +1,7 @@
 import SOPLayout from "@/components/SOPLayout";
 
+const base = import.meta.env.BASE_URL;
+
 const sidebarItems = [
   { id: "introduction", label: "1. Introduction" },
   { id: "purpose", label: "2. Purpose" },
@@ -15,7 +17,7 @@ const sidebarItems = [
 
 const Investigation = () => (
   <SOPLayout title="ESAVI Investigation" version="1.0" updateDate="25/06/2025"
-    headerImage="/images/investigation.png" sidebarItems={sidebarItems}
+    headerImage={`${base}images/investigation.png`} sidebarItems={sidebarItems}
     backLink={{ to: "/sop-overview", label: "SOP Overview" }}>
 
     <section id="introduction" className="sop-section">
@@ -90,7 +92,7 @@ const Investigation = () => (
         <li>There is suspected programmatic error</li>
       </ul>
       <p className="text-sm text-muted-foreground mt-3">Investigations for serious cases should begin within <strong className="text-foreground">48 hours</strong> of notification.</p>
-      <img src="/images/ESAVI_clusters.png" alt="ESAVI clusters investigation flowchart" className="w-full rounded-lg border border-border mt-4" />
+      <img src={`${base}images/ESAVI_clusters.png`} alt="ESAVI clusters investigation flowchart" className="w-full rounded-lg border border-border mt-4" />
       <p className="text-xs text-muted-foreground mt-2 italic">Figure: ESAVI clusters investigation flowchart</p>
     </section>
 

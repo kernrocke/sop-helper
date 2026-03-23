@@ -1,5 +1,7 @@
 import SOPLayout from "@/components/SOPLayout";
 
+const base = import.meta.env.BASE_URL;
+
 const sidebarItems = [
   { id: "introduction", label: "1. Introduction" },
   { id: "purpose", label: "2. Purpose" },
@@ -12,7 +14,7 @@ const sidebarItems = [
 
 const CaseManagement = () => (
   <SOPLayout title="ESAVI Case Management" version="1.0" updateDate="31/05/2025"
-    headerImage="/images/case_management.png" sidebarItems={sidebarItems}
+    headerImage={`${base}images/case_management.png`} sidebarItems={sidebarItems}
     backLink={{ to: "/sop-overview", label: "SOP Overview" }}>
 
     <section id="introduction" className="sop-section">
@@ -76,7 +78,7 @@ const CaseManagement = () => (
         </div>
       </div>
 
-      <img src="/images/case_management_TTO.png" alt="T&T ESAVI Case Management Flow Diagram" className="w-full rounded-lg border border-border" />
+      <img src={`${base}images/case_management_TTO.png`} alt="T&T ESAVI Case Management Flow Diagram" className="w-full rounded-lg border border-border" />
       <p className="text-xs text-muted-foreground mt-2 italic">Figure: T&T ESAVI Surveillance System Flow Diagram - Case Management</p>
     </section>
   </SOPLayout>
