@@ -1,5 +1,7 @@
 import SOPLayout from "@/components/SOPLayout";
 
+const base = import.meta.env.BASE_URL;
+
 const sidebarItems = [
   { id: "introduction", label: "1. Introduction" },
   { id: "purpose", label: "2. Purpose" },
@@ -19,7 +21,7 @@ const sidebarItems = [
 
 const Detection = () => (
   <SOPLayout title="ESAVI Detection and Reporting (Paper Based)" version="1.0" updateDate="25/06/2025"
-    headerImage="/images/detection.png" sidebarItems={sidebarItems}
+    headerImage={`${base}images/detection.png`} sidebarItems={sidebarItems}
     backLink={{ to: "/sop-overview", label: "SOP Overview" }}>
 
     <section id="introduction" className="sop-section">
@@ -95,7 +97,7 @@ const Detection = () => (
         <li>Suspected of causing an abortion</li>
       </ol>
       <p className="text-sm text-muted-foreground mb-3">A <strong className="text-foreground">non-serious ESAVI</strong> does NOT meet serious criteria and resolves without medical intervention.</p>
-      <img src="/images/esavi_detection.png" alt="ESAVI detection and seriousness categorization algorithm" className="w-full rounded-lg border border-border" />
+      <img src={`${base}images/esavi_detection.png`} alt="ESAVI detection and seriousness categorization algorithm" className="w-full rounded-lg border border-border" />
       <p className="text-xs text-muted-foreground mt-2 italic">Figure 1: ESAVI detection and seriousness categorization algorithm</p>
     </section>
 
