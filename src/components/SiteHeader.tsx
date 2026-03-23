@@ -1,6 +1,8 @@
 import { Link, useLocation } from "react-router-dom";
-import { Home, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { useState } from "react";
+
+const base = import.meta.env.BASE_URL;
 
 const navLinks = [
   { to: "/", label: "Home" },
@@ -19,7 +21,7 @@ const SiteHeader = () => {
       <div className="container mx-auto px-4 py-4">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center gap-4">
-            <img src="/images/moh_logo.png" alt="Ministry of Health - Trinidad and Tobago" className="h-14 md:h-16 bg-card rounded p-1" />
+            <img src={`${base}images/moh_logo.png`} alt="Ministry of Health - Trinidad and Tobago" className="h-14 md:h-16 bg-card rounded p-1" />
             <div className="hidden sm:block">
               <p className="text-xs opacity-80 font-sans">Government of the Republic of Trinidad and Tobago</p>
               <h1 className="text-lg md:text-xl font-heading font-bold leading-tight">ESAVI Surveillance Hub</h1>
