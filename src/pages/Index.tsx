@@ -1,13 +1,15 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 
+const base = import.meta.env.BASE_URL;
+
 const hubItems = [
-  { to: "/manual", img: "/images/manual_tto.png", label: "National ESAVI Manual" },
-  { to: "/sop-overview", img: "/images/sop_tto.png", label: "ESAVI SOPs" },
-  { to: "/ai-assistant", img: "/images/AI_image.png", label: "AI Assistant" },
-  { href: "https://iris.paho.org/handle/10665.2/55945", img: "/images/paho_manual.png", label: "PAHO Regional Manual" },
-  { href: "https://health.gov.tt/services/vaccines-and-immunization/vaccine-safety", img: "/images/information.png", label: "General Information" },
-  { to: "/faq", img: "/images/faq.png", label: "FAQ" },
+  { to: "/manual", img: `${base}images/manual_tto.png`, label: "National ESAVI Manual" },
+  { to: "/sop-overview", img: `${base}images/sop_tto.png`, label: "ESAVI SOPs" },
+  { to: "/ai-assistant", img: `${base}images/AI_image.png`, label: "AI Assistant" },
+  { href: "https://iris.paho.org/handle/10665.2/55945", img: `${base}images/paho_manual.png`, label: "PAHO Regional Manual" },
+  { href: "https://health.gov.tt/services/vaccines-and-immunization/vaccine-safety", img: `${base}images/information.png`, label: "General Information" },
+  { to: "/faq", img: `${base}images/faq.png`, label: "FAQ" },
 ];
 
 const categories = [
