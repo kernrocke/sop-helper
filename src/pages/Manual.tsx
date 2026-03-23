@@ -1,5 +1,7 @@
 import SOPLayout from "@/components/SOPLayout";
 
+const base = import.meta.env.BASE_URL;
+
 const sidebarItems = [
   { id: "acknowledgements", label: "Acknowledgements" },
   { id: "ch1", label: "1. Introduction" },
@@ -14,7 +16,7 @@ const sidebarItems = [
 ];
 
 const Manual = () => (
-  <SOPLayout title="National ESAVI Manual for Trinidad and Tobago" headerImage="/images/manual_tto.png" sidebarItems={sidebarItems}>
+  <SOPLayout title="National ESAVI Manual for Trinidad and Tobago" headerImage={`${base}images/manual_tto.png`} sidebarItems={sidebarItems}>
     <section id="acknowledgements" className="sop-section">
       <h2 className="text-xl font-heading font-bold text-secondary mb-3">Acknowledgements</h2>
       <p className="text-sm text-muted-foreground">This manual was completed with the support of PAHO, the Ministry of Health and the Expanded Programme on Immunisation (EPI) of Trinidad and Tobago.</p>
