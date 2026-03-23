@@ -1,12 +1,14 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
 
+const base = import.meta.env.BASE_URL;
+
 const sops = [
-  { to: "/detection", img: "/images/detection.png", label: "Detection and Notification" },
-  { to: "/investigation", img: "/images/investigation.png", label: "Investigation" },
-  { to: "/causality", img: "/images/causality.png", label: "Causality Assessment & Final Classification" },
-  { to: "/case-management", img: "/images/case_management.png", label: "Case Management" },
-  { to: "/data-analysis", img: "/images/data_analysis.png", label: "Data Management & Analysis" },
+  { to: "/detection", img: `${base}images/detection.png`, label: "Detection and Notification" },
+  { to: "/investigation", img: `${base}images/investigation.png`, label: "Investigation" },
+  { to: "/causality", img: `${base}images/causality.png`, label: "Causality Assessment & Final Classification" },
+  { to: "/case-management", img: `${base}images/case_management.png`, label: "Case Management" },
+  { to: "/data-analysis", img: `${base}images/data_analysis.png`, label: "Data Management & Analysis" },
 ];
 
 const SOPOverview = () => (
